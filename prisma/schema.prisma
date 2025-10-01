@@ -1,0 +1,122 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_V2")
+}
+
+enum UserRole {
+  SUPER_USER
+  USER_ADMIN
+  USER_CASUAL
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  id                Int             @id @default(autoincrement())
+  email             String          @unique
+  password          String
+  firstName         String
+  lastName          String
+  avatarUrl         String?         // URL de la foto de perfil (opcional)
+  role              UserRole        @default(USER_CASUAL)
+  status            UserStatus      @default(PENDING_VERIFICATION)
+  isEmailVerified   Boolean         @default(false)
+  lastLogin         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  // Relación jerárquica - quién creó a este usuario
+  createdById       Int?
+  createdBy         User?           @relation("UserHierarchy", fields: [createdById], references: [id])
+  createdUsers      User[]          @relation("UserHierarchy")
+  
+  // Verificaciones de email
+  emailVerifications EmailVerification[]
+  
+  // Tokens de refresh
+  refreshTokens     RefreshToken[]
+  
+  // Logs de login
+  loginLogs         LoginLog[]
+
+  @@map("users")
+}
+
+model EmailVerification {
+  id          String    @id @default(cuid())
+  userId      Int
+  code        String    @unique
+  expiresAt   DateTime
+  isUsed      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verifications")
+}
+
+model RefreshToken {
+  id          String    @id @default(cuid())
+  userId      Int
+  token       String    @unique
+  expiresAt   DateTime
+  isRevoked   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Permission {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  role         UserRole
+  permissionId String
+  createdAt    DateTime   @default(now())
+  
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@map("role_permissions")
+}
+
+model LoginLog {
+  id           String     @id @default(cuid())
+  userId       Int
+  loginTime    DateTime   @default(now())
+  userType     UserRole   
+  userName     String     // firstName + lastName para fácil consulta
+  ipAddress    String?    // IP del cliente
+  userAgent    String?    // Navegador/cliente usado
+  loginMethod  String     // "email", "refresh_token"
+  success      Boolean    @default(true)
+  errorMessage String?    // En caso de login fallido
+  createdAt    DateTime   @default(now())
+  
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("login_logs")
+}
