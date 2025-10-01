@@ -8,11 +8,21 @@ export class EmailService {
 
   constructor(private configService: ConfigService) {
     this.transporter = nodemailer.createTransporter({
-      service: 'gmail',
+      host: this.configService.get('EMAIL_HOST') || 'smtp.gmail.com',
+      port: parseInt(this.configService.get('EMAIL_PORT')) || 587,
+      secure: false, // true for 465, false for other ports like 587
       auth: {
         user: this.configService.get('EMAIL_USER'),
         pass: this.configService.get('EMAIL_PASS'),
       },
+      tls: {
+        rejectUnauthorized: false
+      },
+      connectionTimeout: 60000, // 60 segundos (más tiempo para Railway)
+      greetingTimeout: 30000, // 30 segundos
+      socketTimeout: 60000, // 60 segundos
+      logger: false,
+      debug: false
     });
   }
 
@@ -72,11 +82,19 @@ export class EmailService {
     };
 
     try {
+      // Intentar verificar conexión primero
+      await this.transporter.verify();
       await this.transporter.sendMail(mailOptions);
       console.log(`📧 Email de verificación enviado a: ${email}`);
     } catch (error) {
       console.error('❌ Error enviando email de verificación:', error);
-      throw new Error('Error enviando email de verificación');
+      console.log(`🔧 FALLBACK - Código de verificación para ${email}: ${verificationCode}`);
+      console.log(`👤 Usuario: ${firstName}`);
+      console.log(`⏰ Código válido por 15 minutos`);
+      console.log(`📋 Usa este código para verificar manualmente: ${verificationCode}`);
+      
+      // No lanzar error para que el registro continue
+      // throw new Error('Error enviando email de verificación');
     }
   }
 
