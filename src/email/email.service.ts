@@ -7,7 +7,7 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor(private configService: ConfigService) {
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       host: this.configService.get('EMAIL_HOST') || 'smtp.gmail.com',
       port: parseInt(this.configService.get('EMAIL_PORT')) || 587,
       secure: false, // true for 465, false for other ports like 587
