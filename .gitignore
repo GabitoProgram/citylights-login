@@ -1,5 +1,4 @@
-# Logs
-logs
+# Logs (archivos, NO la carpeta src/logs/)
 *.log
 npm-debug.log*
 pnpm-debug.log*
