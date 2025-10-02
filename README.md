@@ -145,8 +145,8 @@
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/GabitoProgram/citylights-auth.git
-cd citylights-auth
+git clone https://github.com/GabitoProgram/citylights-login.git
+cd citylights-login
 
 # Instalar dependencias
 npm install
@@ -323,28 +323,6 @@ curl -X POST "https://auth-service.railway.app/api/auth/refresh" \
   }'
 ```
 
-#### POST `/api/auth/forgot-password`
-**Descripción:** Solicitar reset de contraseña
-```bash
-curl -X POST "https://auth-service.railway.app/api/auth/forgot-password" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "usuario@ejemplo.com"
-  }'
-```
-
-#### POST `/api/auth/reset-password`
-**Descripción:** Cambiar contraseña con código de verificación
-```bash
-curl -X POST "https://auth-service.railway.app/api/auth/reset-password" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "usuario@ejemplo.com",
-    "code": "123456",
-    "newPassword": "nuevaPassword123"
-  }'
-```
-
 #### GET `/api/auth/health`
 **Descripción:** Verificar estado del servicio
 ```bash
@@ -360,25 +338,6 @@ curl -X GET "https://auth-service.railway.app/api/users/profile" \
   -H "Authorization: Bearer tu_jwt_token"
 ```
 
-**Respuesta:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "email": "usuario@ejemplo.com",
-    "firstName": "Juan",
-    "lastName": "Pérez",
-    "avatarUrl": "https://example.com/avatar.jpg",
-    "role": "USER_CASUAL",
-    "status": "ACTIVE",
-    "isEmailVerified": true,
-    "lastLogin": "2024-01-15T10:30:00.000Z",
-    "createdAt": "2024-01-10T09:00:00.000Z"
-  }
-}
-```
-
 #### POST `/api/users/create-admin`
 **Descripción:** Crear usuario administrador (Solo SUPER_USER)
 ```bash
@@ -389,20 +348,6 @@ curl -X POST "https://auth-service.railway.app/api/users/create-admin" \
     "email": "admin@ejemplo.com",
     "password": "adminPassword123",
     "firstName": "Admin",
-    "lastName": "User"
-  }'
-```
-
-#### POST `/api/users/create-super`
-**Descripción:** Crear super usuario (Solo SUPER_USER)
-```bash
-curl -X POST "https://auth-service.railway.app/api/users/create-super" \
-  -H "Authorization: Bearer super_user_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "super@ejemplo.com",
-    "password": "superPassword123",
-    "firstName": "Super",
     "lastName": "User"
   }'
 ```
@@ -424,29 +369,11 @@ curl -X POST "https://auth-service.railway.app/api/upload/avatar" \
   -F "avatar=@/path/to/image.jpg"
 ```
 
-**Respuesta:**
-```json
-{
-  "success": true,
-  "message": "Avatar subido exitosamente",
-  "data": {
-    "avatarUrl": "https://auth-service.railway.app/api/upload/avatar/unique-filename.jpg",
-    "userId": 1
-  }
-}
-```
-
 #### DELETE `/api/upload/avatar`
 **Descripción:** Eliminar avatar del usuario
 ```bash
 curl -X DELETE "https://auth-service.railway.app/api/upload/avatar" \
   -H "Authorization: Bearer tu_jwt_token"
-```
-
-#### GET `/api/upload/avatar/:filename`
-**Descripción:** Obtener imagen de avatar
-```bash
-curl -X GET "https://auth-service.railway.app/api/upload/avatar/unique-filename.jpg"
 ```
 
 ---
@@ -493,22 +420,12 @@ curl -X GET "https://auth-service.railway.app/api/upload/avatar/unique-filename.
 - ✅ Gestión completa de usuarios
 - ✅ Acceso a logs y auditorías
 
-**Restricciones:**
-- ❌ No puede registrarse públicamente
-- ❌ Solo puede ser creado por otro SUPER_USER
-
 #### 🟡 USER_ADMIN
 **Permisos Intermedios:**
 - ✅ Ver listado de usuarios con paginación
 - ✅ Gestionar usuarios casuales (solo ver)
 - ✅ Acceder a funciones administrativas limitadas
 - ✅ Ver su propio perfil y modificarlo
-
-**Restricciones:**
-- ❌ No puede crear otros usuarios
-- ❌ No puede registrarse públicamente
-- ❌ Solo puede ser creado por SUPER_USER
-- ❌ No acceso a funciones de super usuario
 
 #### 🟢 USER_CASUAL
 **Permisos Básicos:**
@@ -517,33 +434,6 @@ curl -X GET "https://auth-service.railway.app/api/upload/avatar/unique-filename.
 - ✅ Subir y cambiar avatar
 - ✅ Cambiar contraseña
 - ✅ Usar funcionalidades del sistema
-
-**Restricciones:**
-- ❌ No puede ver otros usuarios
-- ❌ No puede crear usuarios
-- ❌ No acceso a funciones administrativas
-- ❌ Requiere verificación por email
-
-### Flujo de Creación de Usuarios
-
-```mermaid
-graph TD
-    A[Usuario quiere registrarse] --> B{Tipo de registro}
-    
-    B -->|Registro público| C[POST /api/auth/register]
-    C --> D[Crear USER_CASUAL]
-    D --> E[Enviar email verificación]
-    E --> F[Usuario verifica email]
-    F --> G[Cuenta ACTIVA]
-    
-    B -->|Crear Admin| H[SUPER_USER usa POST /api/users/create-admin]
-    H --> I[Crear USER_ADMIN]
-    I --> J[Cuenta ACTIVA inmediatamente]
-    
-    B -->|Crear Super| K[SUPER_USER usa POST /api/users/create-super]
-    K --> L[Crear SUPER_USER]
-    L --> M[Cuenta ACTIVA inmediatamente]
-```
 
 ---
 
@@ -585,35 +475,6 @@ const requireNumbers = true;
 const requireSpecialChars = false;
 ```
 
-### Email Verification
-
-```typescript
-// Código de verificación
-const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6 dígitos
-const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
-
-// Almacenamiento seguro
-await prisma.emailVerification.create({
-  data: {
-    userId: user.id,
-    code: code,
-    expiresAt: expiresAt
-  }
-});
-```
-
-### Rate Limiting Strategy
-
-```typescript
-// Configuración recomendada
-{
-  login: '5 intentos por 15 minutos',
-  register: '3 registros por hora por IP',
-  verifyEmail: '10 intentos por hora',
-  forgotPassword: '3 intentos por hora por email'
-}
-```
-
 ---
 
 ## 🛠️ Guía para Desarrolladores
@@ -626,7 +487,7 @@ await prisma.emailVerification.create({
 # Instalar dependencias
 npm install
 
-# Configurar variables de entorno
+# Configurar variables de entorno para desarrollo local
 cat > .env << EOF
 PORT=3001
 NODE_ENV=development
@@ -668,318 +529,6 @@ npx prisma studio
 npm run start:dev
 
 # El servicio estará disponible en http://localhost:3001
-```
-
-#### 4. Crear Usuario de Prueba
-
-```bash
-# Registrar usuario casual
-curl -X POST http://localhost:3001/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "password123",
-    "firstName": "Test",
-    "lastName": "User"
-  }'
-
-# El código de verificación aparecerá en la consola si DISABLE_EMAIL_SENDING=true
-# Verificar email con el código
-curl -X POST http://localhost:3001/api/auth/verify-email \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "code": "123456"
-  }'
-
-# Login
-curl -X POST http://localhost:3001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "password123"
-  }'
-```
-
-### Estructura del Proyecto
-
-```
-src/
-├── auth/                   # Módulo de autenticación
-│   ├── dto/               # Data Transfer Objects
-│   ├── guards/            # Guards de autenticación
-│   ├── strategies/        # Estrategias de Passport
-│   ├── decorators/        # Decoradores personalizados
-│   ├── auth.controller.ts # Controlador de auth
-│   ├── auth.service.ts    # Lógica de autenticación
-│   └── auth.module.ts     # Módulo de auth
-├── users/                 # Módulo de usuarios
-│   ├── dto/               # DTOs de usuarios
-│   ├── users.controller.ts# Controlador de usuarios
-│   ├── users.service.ts   # Lógica de usuarios
-│   └── users.module.ts    # Módulo de usuarios
-├── email/                 # Módulo de emails
-│   ├── email.service.ts   # Servicio de emails
-│   └── email.module.ts    # Módulo de emails
-├── upload/                # Módulo de uploads
-│   ├── multer.config.ts   # Configuración de Multer
-│   ├── upload.controller.ts
-│   ├── upload.service.ts
-│   └── upload.module.ts
-├── prisma/                # Cliente de Prisma
-│   └── prisma.service.ts
-├── logs/                  # Módulo de logs
-├── app.module.ts          # Módulo principal
-└── main.ts               # Punto de entrada
-```
-
-### Extender el Sistema
-
-#### Agregar Nuevo Endpoint
-
-```typescript
-// En auth.controller.ts
-@Post('nueva-funcionalidad')
-@UseGuards(JwtAuthGuard)
-async nuevaFuncionalidad(@Body() dto: NuevoDto, @Request() req) {
-  const userId = req.user.sub;
-  const result = await this.authService.nuevaFuncionalidad(dto, userId);
-  
-  return {
-    success: true,
-    data: result
-  };
-}
-```
-
-#### Crear Nuevo Rol
-
-```typescript
-// En schema.prisma
-enum UserRole {
-  SUPER_USER
-  USER_ADMIN
-  USER_CASUAL
-  NUEVO_ROL  // Agregar aquí
-}
-
-// En decoradores/roles
-@Roles(UserRole.NUEVO_ROL)
-async endpointEspecifico() {
-  // Lógica específica para el nuevo rol
-}
-```
-
-#### Agregar Nueva Validación
-
-```typescript
-// En dto/auth.dto.ts
-export class NuevoDto {
-  @IsEmail()
-  @IsNotEmpty()
-  email: string;
-
-  @IsString()
-  @MinLength(8)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message: 'Password must contain uppercase, lowercase and number'
-  })
-  password: string;
-}
-```
-
-### Testing
-
-#### Unit Tests
-
-```typescript
-// auth.service.spec.ts
-describe('AuthService', () => {
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [AuthService, PrismaService, EmailService, JwtService],
-    }).compile();
-
-    service = module.get<AuthService>(AuthService);
-  });
-
-  it('should register user successfully', async () => {
-    const registerDto = {
-      email: 'test@example.com',
-      password: 'password123',
-      firstName: 'Test',
-      lastName: 'User'
-    };
-
-    const result = await service.register(registerDto);
-    expect(result.user.email).toBe(registerDto.email);
-    expect(result.user.role).toBe(UserRole.USER_CASUAL);
-  });
-});
-```
-
-#### Integration Tests
-
-```bash
-# Ejecutar tests
-npm run test
-
-# Tests con coverage
-npm run test:cov
-
-# Tests end-to-end
-npm run test:e2e
-```
-
-### Debugging
-
-#### Logs Detallados
-
-```typescript
-// En desarrollo, agregar logs
-console.log('🔍 [AUTH] User attempting login:', loginDto.email);
-console.log('📧 [EMAIL] Sending verification to:', email);
-console.log('🔑 [JWT] Token generated for user:', userId);
-```
-
-#### Database Debugging
-
-```bash
-# Ver datos en tiempo real
-npx prisma studio
-
-# Reset base de datos
-npx prisma db push --force-reset
-
-# Ver logs de consultas
-# Agregar a schema.prisma:
-# log = ["query", "info", "warn", "error"]
-```
-
----
-
-## 🐳 Docker
-
-### Dockerfile Optimizado
-
-```dockerfile
-# Build stage
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-# Copiar archivos de dependencias
-COPY package*.json ./
-COPY prisma ./prisma/
-
-# Instalar dependencias
-RUN npm ci --only=production
-
-# Generar cliente Prisma
-RUN npx prisma generate
-
-# Production stage
-FROM node:18-alpine AS production
-
-# Crear usuario no-root
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S auth -u 1001
-
-WORKDIR /app
-
-# Instalar dependencias del sistema para Sharp
-RUN apk add --no-cache libc6-compat
-
-# Copiar archivos de aplicación
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
-COPY --chown=auth:nodejs . .
-
-# Crear directorio de uploads
-RUN mkdir -p uploads && chown auth:nodejs uploads
-
-# Compilar la aplicación
-RUN npm run build
-
-# Cambiar a usuario no-root
-USER auth
-
-# Exponer puerto
-EXPOSE 3001
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3001/api/auth/health || exit 1
-
-# Comando de inicio
-CMD ["npm", "run", "start:prod"]
-```
-
-### Docker Compose para Desarrollo
-
-```yaml
-version: '3.8'
-
-services:
-  auth:
-    build: .
-    ports:
-      - "3001:3001"
-    environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/citylights_auth
-      - JWT_SECRET=desarrollo_jwt_secret
-      - EMAIL_HOST=smtp.gmail.com
-      - EMAIL_USER=${EMAIL_USER}
-      - EMAIL_PASS=${EMAIL_PASS}
-    depends_on:
-      - postgres
-    volumes:
-      - ./uploads:/app/uploads
-    networks:
-      - citylights-network
-
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=citylights_auth
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - citylights-network
-
-volumes:
-  postgres_data:
-
-networks:
-  citylights-network:
-    driver: bridge
-```
-
-### Comandos Docker
-
-```bash
-# Construir imagen
-docker build -t citylights-auth .
-
-# Ejecutar contenedor
-docker run -p 3001:3001 \
-  -e DATABASE_URL=postgresql://... \
-  -e JWT_SECRET=tu_secreto \
-  citylights-auth
-
-# Ejecutar con docker-compose
-docker-compose up -d
-
-# Ver logs
-docker-compose logs auth
-
-# Ejecutar comandos en contenedor
-docker-compose exec auth npx prisma studio
 ```
 
 ---
@@ -1034,64 +583,6 @@ ALLOWED_FILE_TYPES=jpeg,jpg,png,webp
 LOG_LEVEL=info
 ```
 
-#### 3. Post-Deploy Setup
-
-```bash
-# Aplicar migraciones después del deploy
-railway run npx prisma db push
-
-# Crear primer super usuario (usar script)
-railway run node create-super-user.js
-```
-
-### Heroku
-
-```bash
-# Crear aplicación
-heroku create citylights-auth
-
-# Agregar PostgreSQL
-heroku addons:create heroku-postgresql:mini
-
-# Configurar variables
-heroku config:set NODE_ENV=production
-heroku config:set JWT_SECRET=tu_jwt_secret
-heroku config:set EMAIL_HOST=smtp.gmail.com
-heroku config:set EMAIL_USER=tu-email@gmail.com
-heroku config:set EMAIL_PASS=tu-app-password
-
-# Desplegar
-git push heroku main
-
-# Aplicar migraciones
-heroku run npx prisma db push
-```
-
-### Verificación de Despliegue
-
-```bash
-# Verificar health check
-curl https://tu-auth-service.railway.app/api/auth/health
-
-# Test de registro
-curl -X POST https://tu-auth-service.railway.app/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "password123",
-    "firstName": "Test",
-    "lastName": "User"
-  }'
-
-# Test de login
-curl -X POST https://tu-auth-service.railway.app/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "password123"
-  }'
-```
-
 ---
 
 ## 🧪 Testing
@@ -1121,88 +612,6 @@ npm run test:e2e
 npm run test auth.service.spec.ts
 ```
 
-#### 3. Manual Testing con Scripts
-
-```javascript
-// test-auth-flow.js
-const axios = require('axios');
-
-async function testAuthFlow() {
-  const baseURL = 'http://localhost:3001/api';
-  
-  try {
-    // 1. Registrar usuario
-    const registerResponse = await axios.post(`${baseURL}/auth/register`, {
-      email: 'test@example.com',
-      password: 'password123',
-      firstName: 'Test',
-      lastName: 'User'
-    });
-    console.log('✅ Register:', registerResponse.data);
-    
-    // 2. Verificar email (usar código de consola)
-    const verifyResponse = await axios.post(`${baseURL}/auth/verify-email`, {
-      email: 'test@example.com',
-      code: '123456' // Cambiar por código real
-    });
-    console.log('✅ Verify:', verifyResponse.data);
-    
-    // 3. Login
-    const loginResponse = await axios.post(`${baseURL}/auth/login`, {
-      email: 'test@example.com',
-      password: 'password123'
-    });
-    console.log('✅ Login:', loginResponse.data);
-    
-    // 4. Obtener perfil
-    const token = loginResponse.data.access_token;
-    const profileResponse = await axios.get(`${baseURL}/users/profile`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    console.log('✅ Profile:', profileResponse.data);
-    
-  } catch (error) {
-    console.error('❌ Error:', error.response?.data || error.message);
-  }
-}
-
-testAuthFlow();
-```
-
-#### 4. Load Testing
-
-```bash
-# Instalar artillery
-npm install -g artillery
-
-# Crear configuración de load test
-cat > load-test.yml << EOF
-config:
-  target: 'https://tu-auth-service.railway.app'
-  phases:
-    - duration: 60
-      arrivalRate: 5
-scenarios:
-  - name: "Auth flow"
-    requests:
-      - post:
-          url: "/api/auth/register"
-          json:
-            email: "test{{ \$randomInt(1, 1000) }}@example.com"
-            password: "password123"
-            firstName: "Test"
-            lastName: "User"
-      - post:
-          url: "/api/auth/login"
-          json:
-            email: "existing@example.com"
-            password: "password123"
-EOF
-
-# Ejecutar load test
-artillery run load-test.yml
-```
-
 ---
 
 ## 🔧 Troubleshooting
@@ -1223,13 +632,6 @@ echo $DATABASE_URL
 
 # Regenerar cliente Prisma
 npx prisma generate
-
-# Test de conexión
-node -e "
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-prisma.\$connect().then(() => console.log('✅ Connected')).catch(console.error);
-"
 ```
 
 #### 2. Error "JWT secret not configured"
@@ -1243,9 +645,6 @@ echo $JWT_SECRET
 
 # Generar nuevo secret
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-
-# Configurar en Railway
-railway variables set JWT_SECRET=nuevo_secret_generado
 ```
 
 #### 3. Emails no se envían
@@ -1254,109 +653,11 @@ railway variables set JWT_SECRET=nuevo_secret_generado
 
 **Soluciones:**
 ```bash
-# Verificar configuración SMTP
-curl -v telnet://smtp.gmail.com:587
-
-# Test de credenciales
-node -e "
-const nodemailer = require('nodemailer');
-const transporter = nodemailer.createTransporter({
-  host: 'smtp.gmail.com',
-  port: 587,
-  auth: {
-    user: '${EMAIL_USER}',
-    pass: '${EMAIL_PASS}'
-  }
-});
-transporter.verify((error, success) => {
-  if (error) console.error('❌', error);
-  else console.log('✅ SMTP ready');
-});
-"
-
 # Habilitar modo desarrollo
 railway variables set DISABLE_EMAIL_SENDING=true
-```
 
-#### 4. Error de permisos en uploads
-
-**Síntoma:** `Error: EACCES: permission denied`
-
-**Solución:**
-```bash
-# Crear directorio con permisos correctos
-mkdir -p uploads
-chmod 755 uploads
-
-# En Docker, verificar usuario
-docker run --rm -it tu-imagen ls -la /app/uploads
-```
-
-#### 5. Token expirado constantemente
-
-**Síntoma:** `UnauthorizedException: Token inválido o expirado`
-
-**Solución:**
-```bash
-# Verificar configuración de expiración
-echo $JWT_EXPIRES_IN
-
-# Sincronizar tiempo del servidor
-sudo ntpdate -s time.nist.gov
-
-# Verificar token manualmente
-node -e "
-const jwt = require('jsonwebtoken');
-const token = 'tu_token_aqui';
-try {
-  const decoded = jwt.verify(token, '${JWT_SECRET}');
-  console.log('✅ Token válido:', decoded);
-} catch (error) {
-  console.error('❌ Token inválido:', error.message);
-}
-"
-```
-
-### Monitoring & Alertas
-
-#### Health Check Script
-
-```bash
-#!/bin/bash
-# health-monitor.sh
-
-AUTH_URL="https://tu-auth-service.railway.app"
-SLACK_WEBHOOK="tu_slack_webhook_url"
-
-# Check health endpoint
-response=$(curl -s -o /dev/null -w "%{http_code}" "$AUTH_URL/api/auth/health")
-
-if [ $response -ne 200 ]; then
-  curl -X POST $SLACK_WEBHOOK \
-    -H 'Content-type: application/json' \
-    -d '{"text":"🚨 Auth Service is DOWN! HTTP status: '$response'"}'
-fi
-
-# Check database connection
-db_check=$(curl -s "$AUTH_URL/api/auth/health" | jq -r '.database')
-if [ "$db_check" != "Connected" ]; then
-  curl -X POST $SLACK_WEBHOOK \
-    -H 'Content-type: application/json' \
-    -d '{"text":"🚨 Auth Service database is DOWN!"}'
-fi
-```
-
-#### Log Analysis
-
-```bash
-# Analizar errores más comunes
-railway logs | grep "ERROR" | sort | uniq -c | sort -nr
-
-# Monitorear intentos de login fallidos
-railway logs | grep "login failed" | wc -l
-
-# Verificar rendimiento de endpoints
-railway logs | grep "ms" | awk '{print $NF}' | sort -n | tail -10
+# Verificar configuración SMTP
+curl -v telnet://smtp.gmail.com:587
 ```
 
 ---
@@ -1369,19 +670,11 @@ railway logs | grep "ms" | awk '{print $NF}' | sort -n | tail -10
 - **Email:** [tu-email@empresa.com]
 - **Slack:** [#citylights-auth]
 
-### Documentación Adicional
-
-- 📖 **[API Documentation](https://auth-service.railway.app/api/docs)** - Documentación interactiva Swagger
-- 🔧 **[Development Guide](./docs/development.md)** - Guía detallada de desarrollo
-- 🚀 **[Deployment Guide](./docs/deployment.md)** - Guía de despliegue paso a paso
-- 🧪 **[Testing Guide](./docs/testing.md)** - Guía completa de testing
-- 📊 **[Database Schema](./docs/database.md)** - Documentación del esquema de BD
-
 ### Enlaces Útiles
 
 - 🌐 **Auth Service Production:** https://citylights-auth.railway.app
 - 📊 **Monitoring Dashboard:** https://railway.app/dashboard
-- 🐛 **Issue Tracker:** https://github.com/GabitoProgram/citylights-auth/issues
+- 🐛 **Issue Tracker:** https://github.com/GabitoProgram/citylights-login/issues
 - 📚 **NestJS Documentation:** https://docs.nestjs.com
 - 🗃️ **Prisma Documentation:** https://www.prisma.io/docs
 
@@ -1402,14 +695,6 @@ Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](L
 3. Commit tus cambios (`git commit -m 'Agregar nueva funcionalidad'`)
 4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
 5. Abre un Pull Request
-
-### Estándares de Código
-
-- Usar TypeScript para todo el código
-- Seguir las convenciones de NestJS
-- Escribir tests para nuevas funcionalidades
-- Documentar endpoints y funciones importantes
-- Usar Prettier para formateo de código
 
 ---
 
@@ -1438,294 +723,3 @@ Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](L
 > - 🏠 [Frontend](https://github.com/GabitoProgram/citylights-frontend)
 > - 🏨 [Booking Service](https://github.com/GabitoProgram/citylights-booking)
 > - 💼 [Nomina Service](https://github.com/GabitoProgram/citylights-nomina)
-- ✅ Acceso completo al sistema
-
-## 🛠️ Tecnologías
-
-- NestJS
-- TypeScript
-- PostgreSQL
-- Prisma ORM
-- JWT (access + refresh tokens)
-- Nodemailer (Gmail SMTP)
-- bcrypt
-- class-validator
-
-## 📝 API Endpoints
-
-### 🔐 Autenticación Pública
-
-```
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "email": "usuario@email.com",
-  "password": "password123",
-  "firstName": "Juan",
-  "lastName": "Pérez"
-}
-```
-
-```
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "usuario@email.com",
-  "password": "password123"
-}
-```
-
-```
-POST /api/auth/verify-email
-Content-Type: application/json
-
-{
-  "email": "usuario@email.com",
-  "code": "123456"
-}
-```
-
-```
-POST /api/auth/refresh
-Content-Type: application/json
-
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-### 👥 Gestión de Usuarios (Protegidos)
-
-```
-POST /api/users/create-admin
-Authorization: Bearer {accessToken}
-Content-Type: application/json
-
-{
-  "email": "admin@email.com",
-  "password": "password123",
-  "firstName": "Admin",
-  "lastName": "Usuario"
-}
-```
-
-```
-POST /api/users/create-super
-Authorization: Bearer {accessToken}
-Content-Type: application/json
-
-{
-  "email": "super@email.com",
-  "password": "password123",
-  "firstName": "Super",
-  "lastName": "Usuario"
-}
-```
-
-```
-GET /api/users/profile
-Authorization: Bearer {accessToken}
-```
-
-```
-GET /api/users/list?page=1&limit=10
-Authorization: Bearer {accessToken}
-```
-
-## 🚀 Instalación y Configuración
-
-### 1. Clonar y preparar el proyecto
-
-```bash
-# Navegar al directorio
-cd auth-microservice
-
-# Instalar dependencias
-npm install
-
-# Configurar variables de entorno
-cp .env.example .env
-```
-
-### 2. Configurar Base de Datos
-
-Editar `.env`:
-
-```env
-# Database
-DATABASE_URL="postgresql://username:password@localhost:5432/auth_db?schema=public"
-
-# JWT Configuration
-JWT_SECRET="your-super-secret-jwt-key-change-in-production"
-JWT_EXPIRES_IN="15m"
-JWT_REFRESH_SECRET="your-super-secret-refresh-jwt-key-change-in-production"
-JWT_REFRESH_EXPIRES_IN="7d"
-
-# Email Configuration (Gmail SMTP)
-EMAIL_HOST="smtp.gmail.com"
-EMAIL_PORT=587
-EMAIL_USER="your-email@gmail.com"
-EMAIL_PASS="your-app-password"
-EMAIL_FROM="CITYLIGHTS Auth <your-email@gmail.com>"
-
-# Application
-PORT=3001
-NODE_ENV="development"
-
-# CORS Origins (for Gateway integration)
-CORS_ORIGINS="http://localhost:3000,http://localhost:3002"
-```
-
-### 3. Configurar Prisma
-
-```bash
-# Generar cliente de Prisma
-npm run prisma:generate
-
-# Aplicar migraciones
-npm run prisma:push
-
-# Ver base de datos (opcional)
-npm run prisma:studio
-```
-
-### 4. Ejecutar el microservicio
-
-```bash
-# Desarrollo
-npm run start:dev
-
-# Producción
-npm run start:prod
-```
-
-## 📧 Configuración de Email
-
-### Gmail SMTP
-
-1. Activar verificación en 2 pasos
-2. Generar contraseña de aplicación
-3. Usar la contraseña de aplicación en `EMAIL_PASS`
-
-## 🏗️ Estructura del Proyecto
-
-```
-src/
-├── auth/
-│   ├── dto/           # DTOs de autenticación
-│   ├── guards/        # Guards JWT y Roles
-│   ├── decorators/    # Decorador @Roles
-│   ├── strategies/    # Estrategia JWT para Passport
-│   ├── auth.service.ts
-│   ├── auth.controller.ts
-│   └── auth.module.ts
-├── users/
-│   ├── dto/           # DTOs de usuarios
-│   ├── users.service.ts
-│   ├── users.controller.ts
-│   └── users.module.ts
-├── email/
-│   ├── email.service.ts
-│   └── email.module.ts
-├── prisma/
-│   ├── prisma.service.ts
-│   └── prisma.module.ts
-├── app.module.ts
-└── main.ts
-```
-
-## 🔑 JWT Payload
-
-```json
-{
-  "sub": "user-id",
-  "email": "usuario@email.com",
-  "firstName": "Juan",
-  "lastName": "Pérez",
-  "role": "USER_CASUAL",
-  "iat": 1234567890,
-  "exp": 1234567890
-}
-```
-
-## 🗄️ Esquema de Base de Datos
-
-### Tablas Principales
-
-- **users**: Información de usuarios con roles jerárquicos
-- **email_verifications**: Códigos de verificación temporales
-- **refresh_tokens**: Tokens de actualización
-- **permissions**: Permisos del sistema
-- **role_permissions**: Relación roles-permisos
-
-## 🔄 Flujo de Registro
-
-1. Usuario se registra en `/api/auth/register`
-2. Se crea usuario con estado `PENDING_VERIFICATION`
-3. Se genera código de 6 dígitos (15 min válido)
-4. Se envía email con código y template CITYLIGHTS
-5. Usuario verifica en `/api/auth/verify-email`
-6. Cuenta se activa y recibe email de bienvenida
-
-## 🔄 Flujo de Login
-
-1. Usuario hace login en `/api/auth/login`
-2. Se validan credenciales y estado activo
-3. Se generan access token (15min) y refresh token (7 días)
-4. Se actualiza `lastLogin`
-5. Se retorna información del usuario + tokens
-
-## 🔄 Flujo de Creación de Admins
-
-1. Solo SuperUser puede crear UserAdmin
-2. UserAdmin se crea directamente activo
-3. No requiere verificación por email
-4. Se registra quién lo creó (`createdBy`)
-
-## 🛡️ Seguridad
-
-- Contraseñas hasheadas con bcrypt (12 rounds)
-- JWT con secrets separados para access/refresh
-- Códigos de verificación de un solo uso
-- Refresh tokens revocables
-- Guards para protección de rutas
-- Validación de DTOs con class-validator
-
-## 🌐 Integración con Gateway
-
-El microservicio está preparado para integrarse con un Gateway en puerto 3000:
-
-- CORS configurado para el Gateway
-- JWT tokens transportables
-- Endpoints RESTful estándar
-- Respuestas JSON consistentes
-
-## 📋 Scripts Disponibles
-
-```bash
-npm run start          # Iniciar aplicación
-npm run start:dev      # Desarrollo con watch
-npm run start:prod     # Producción
-npm run build          # Compilar TypeScript
-npm run test           # Ejecutar tests
-npm run prisma:generate # Generar cliente Prisma
-npm run prisma:push    # Aplicar schema a DB
-npm run prisma:studio  # Interfaz visual de DB
-```
-
-## 🐳 Docker (Próximamente)
-
-```dockerfile
-# Dockerfile
-FROM node:18-alpine
-# ... configuración Docker
-```
-
----
-
-**🏨 CITYLIGHTS Auth Microservice v1.0.0**  
-*Microservicio de autenticación con roles jerárquicos para sistema de reservas*#   c i t y l i g h t s - l o g i n 
- 
- 
