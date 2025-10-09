@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 @Injectable()
 export class EmailService {
   private transporter: nodemailer.Transporter;
+  private resend: Resend;
 
   constructor(private configService: ConfigService) {
+    // Configurar nodemailer para Gmail (desarrollo local)
     this.transporter = nodemailer.createTransport({
       host: this.configService.get('EMAIL_HOST') || 'smtp.gmail.com',
       port: parseInt(this.configService.get('EMAIL_PORT')) || 587,
@@ -24,21 +27,100 @@ export class EmailService {
       logger: false,
       debug: false
     });
+
+    // Configurar Resend para Railway
+    const resendApiKey = this.configService.get('RESEND_API_KEY');
+    if (resendApiKey) {
+      this.resend = new Resend(resendApiKey);
+    }
   }
 
   async sendVerificationEmail(email: string, firstName: string, verificationCode: string) {
     console.log(`📧 Intentando enviar email a: ${email}`);
-    console.log(`🔑 Usando credenciales: ${this.configService.get('EMAIL_USER')}`);
     
     // Solo usar consola si está explícitamente deshabilitado
     if (process.env.DISABLE_EMAIL_SENDING === 'true') {
-      console.log(`🔧 MODO DESARROLLO - Código de verificación para ${email}: ${verificationCode}`);
+      console.log(`� MODO DESARROLLO - Código de verificación para ${email}: ${verificationCode}`);
       console.log(`👤 Usuario: ${firstName}`);
       console.log(`⏰ Código válido por 15 minutos`);
       console.log(`📋 Copia este código para verificar: ${verificationCode}`);
       return;
     }
 
+    // Decidir qué método usar: Resend para Railway, Gmail para local
+    const useResend = this.configService.get('USE_RESEND') === 'true' || 
+                     process.env.RAILWAY_ENVIRONMENT === 'production' || 
+                     this.resend;
+
+    if (useResend && this.resend) {
+      return this.sendWithResend(email, firstName, verificationCode);
+    } else {
+      return this.sendWithGmail(email, firstName, verificationCode);
+    }
+  }
+
+  private async sendWithResend(email: string, firstName: string, verificationCode: string) {
+    console.log(`📧 Enviando con Resend a: ${email}`);
+    
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: this.configService.get('RESEND_FROM') || 'onboarding@resend.dev',
+        to: email,
+        subject: '🏨 CITYLIGHTS - Código de Verificación',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px;">
+            <div style="background-color: #1e3a8a; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px;">🏨 CITYLIGHTS</h1>
+              <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 16px;">Sistema de Autenticación</p>
+            </div>
+            
+            <div style="background-color: #ffffff; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+              <h2 style="color: #1e40af; margin-bottom: 20px;">¡Hola ${firstName}!</h2>
+              
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+                Gracias por registrarte en CITYLIGHTS. Para completar tu registro, por favor usa el siguiente código:
+              </p>
+              
+              <div style="background-color: #f3f4f6; border-left: 4px solid #1e40af; padding: 20px; margin: 30px 0; text-align: center;">
+                <h3 style="color: #1e40af; margin: 0 0 10px 0;">Código de Verificación</h3>
+                <div style="font-size: 32px; font-weight: bold; color: #1e40af; letter-spacing: 3px; font-family: 'Courier New', monospace;">
+                  ${verificationCode}
+                </div>
+              </div>
+              
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin-top: 30px;">
+                ⏰ Este código expira en 15 minutos<br>
+                🔒 Si no solicitaste este registro, ignora este email
+              </p>
+              
+              <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">
+                  © 2024 CITYLIGHTS - Sistema de Reservas y Autenticación
+                </p>
+              </div>
+            </div>
+          </div>
+        `,
+      });
+
+      if (error) {
+        console.error('❌ Error con Resend:', error);
+        throw new Error(`Error enviando con Resend: ${error.message}`);
+      }
+
+      console.log('✅ Email enviado exitosamente con Resend:', data?.id);
+    } catch (error) {
+      console.error('❌ Error enviando email con Resend:', error);
+      console.log(`🔧 FALLBACK - Código de verificación para ${email}: ${verificationCode}`);
+      console.log(`👤 Usuario: ${firstName}`);
+      console.log(`⏰ Código válido por 15 minutos`);
+    }
+  }
+
+  private async sendWithGmail(email: string, firstName: string, verificationCode: string) {
+    console.log(`📧 Enviando con Gmail a: ${email}`);
+    console.log(`🔑 Usando credenciales: ${this.configService.get('EMAIL_USER')}`);
+    
     const from = this.configService.get('EMAIL_FROM');
     
     const mailOptions = {
